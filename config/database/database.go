@@ -14,7 +14,7 @@ import (
 var Instance *DatabaseInstance
 
 type DatabaseInstance struct {
-	mongoClient *mongo.Client
+	DB *mongo.Database
 }
 
 func InitMongoClient() *DatabaseInstance {
@@ -22,18 +22,18 @@ func InitMongoClient() *DatabaseInstance {
 	client, err := mongo.Connect(context.Background(), options.Client().ApplyURI(connectionUri))
 
 	if err != nil {
-		log.Fatal("Cannot connect to Mongodb")
+		log.Fatal("Cannot connect to Mongodb\n")
 		panic(err)
 	}
-	fmt.Printf("Connected to MongoDB")
-	return &DatabaseInstance{mongoClient: client}
+	fmt.Printf("Connected to MongoDB\n")
+	return &DatabaseInstance{DB: client.Database("test")}
 }
 
-func (s DatabaseInstance) Health() map[string]string {
+func (di *DatabaseInstance) Health() map[string]string {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 
-	err := s.mongoClient.Ping(ctx, nil)
+	err := di.DB.Client().Ping(ctx, nil)
 	if err != nil {
 		log.Fatalf(fmt.Sprintf("db down: %v", err))
 	}

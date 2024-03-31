@@ -12,6 +12,7 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/saldyy/golang-microservices/config/database"
 	"github.com/saldyy/golang-microservices/handler"
+	"github.com/saldyy/golang-microservices/repository"
 	slogecho "github.com/samber/slog-echo"
 )
 
@@ -21,8 +22,6 @@ type Server struct {
 }
 
 func main() {
-
-  fmt.Printf("%s\n", filepath.Join(".", ".env"))
 	err := godotenv.Load(filepath.Join(".", ".env"))
 	if err != nil {
 		log.Fatal("Error loading .env file")
@@ -35,17 +34,20 @@ func main() {
 
 func (s *Server) Run(listen string) error {
 	s.logger.Info("Configuring HTTP server")
+
+	database.Instance = database.InitMongoClient()
+  repos := repository.Init(database.Instance.DB)
+
 	e := echo.New()
 	e.HideBanner = true
 	e.Use(slogecho.New(s.logger))
 	e.Use(middleware.Recover())
 
+
 	e.GET("/health", handler.HealthCheckHandler)
+  handler.RegisterRoutes(e, repos, s.logger)
 
-	e.POST("login", handler.LoginHandler)
-	e.POST("/sign-up", handler.SignUpHandler)
 
-	e.GET("/users", handler.GetUser)
 
 	e.HTTPErrorHandler = func(err error, ctx echo.Context) {
 		code := 500
@@ -58,7 +60,6 @@ func (s *Server) Run(listen string) error {
 
 	s.echo = e
 
-	database.Instance = database.InitMongoClient()
 
 	return s.echo.Start(":8080")
 }
