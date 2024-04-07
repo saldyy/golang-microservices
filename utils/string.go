@@ -11,9 +11,14 @@ const (
 )
 
 func BcryptHash(str string) (string, error) {
-  hash, err := bcrypt.GenerateFromPassword([]byte(str), DefaultCost)
-  if err != nil {
-    return "", err
-  }
-  return string(hash), nil
+	hash, err := bcrypt.GenerateFromPassword([]byte(str), DefaultCost)
+	if err != nil {
+		return "", err
+	}
+	return string(hash), nil
+}
+
+func IsMatchBcryptHash(hashed string, str string) bool {
+	err := bcrypt.CompareHashAndPassword([]byte(hashed), []byte(str))
+	return err == nil
 }

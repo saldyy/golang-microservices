@@ -35,11 +35,17 @@ func (u *UserHandler) LoginHandler(c echo.Context) error {
 	if err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
 			u.logger.Debug("User not found", err)
-			return c.String(http.StatusNotFound, "Notfound")
+			return c.JSON(http.StatusForbidden, map[string]string{"message": "User not found"})
 		}
 
 		return c.String(http.StatusOK, "Error")
 	}
+
+  isPasswordMatch := utils.IsMatchBcryptHash(user.Password, credential.Password)
+
+  if !isPasswordMatch {
+    return c.JSON(http.StatusForbidden, map[string]string{"message": "Invalid password"})
+  }
 
 	return c.String(http.StatusOK, user.Username)
 }
@@ -52,9 +58,6 @@ func (u *UserHandler) RegisterHandler(c echo.Context) error {
   }
 
 	existedUser, err := u.userRepo.FindByUsername(credential.Username)
-
-	fmt.Printf("user: %v\n", existedUser)
-	fmt.Printf("err: %v\n", err)
 
 	if existedUser != nil {
 		u.logger.Error("User already existed", err)

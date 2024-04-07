@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/saldyy/golang-microservices/model"
 	"go.mongodb.org/mongo-driver/bson"
