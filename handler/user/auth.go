@@ -2,10 +2,12 @@ package user
 
 import (
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
+	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/labstack/echo/v4"
 	"github.com/saldyy/golang-microservices/model"
 	"github.com/saldyy/golang-microservices/repository"
@@ -13,7 +15,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-type UserHandler struct {
+type AuthHandler struct {
 	userRepo *repository.UserRepository
 	logger   *slog.Logger
 }
@@ -41,21 +43,37 @@ func (u *UserHandler) LoginHandler(c echo.Context) error {
 		return c.String(http.StatusOK, "Error")
 	}
 
-  isPasswordMatch := utils.IsMatchBcryptHash(user.Password, credential.Password)
+	isPasswordMatch := utils.IsMatchBcryptHash(user.Password, credential.Password)
 
-  if !isPasswordMatch {
-    return c.JSON(http.StatusForbidden, map[string]string{"message": "Invalid password"})
-  }
+	if !isPasswordMatch {
+		return c.JSON(http.StatusForbidden, map[string]string{"message": "Invalid password"})
+	}
 
-	return c.String(http.StatusOK, user.Username)
+	jwtClaims := &jwt.RegisteredClaims{
+		Subject:   user.Id,
+		Issuer:    "auth-service",
+		IssuedAt:  jwt.NewNumericDate(time.Now()),
+		ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
+    
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS512, jwtClaims)
+  token.Header["kid"] = os.Getenv("JWT_KID")
+
+	t, err := token.SignedString([]byte(os.Getenv("JWT_SECRET")))
+	if err != nil {
+		u.logger.Error("Error signing token", err)
+		return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Internal server error"})
+	}
+
+	return c.JSON(http.StatusOK, map[string]string{"access_token": t})
 }
 
 func (u *UserHandler) RegisterHandler(c echo.Context) error {
 	credential := new(LoginCredential)
 
-  if err := c.Bind(credential); err != nil {
-    return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid payload"})
-  }
+	if err := c.Bind(credential); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid payload"})
+	}
 
 	existedUser, err := u.userRepo.FindByUsername(credential.Username)
 
@@ -82,11 +100,11 @@ func (u *UserHandler) RegisterHandler(c echo.Context) error {
 	return c.String(http.StatusOK, "user.Username")
 }
 
-func RegisterUserHandlers(e *echo.Echo, repo *repository.Repository, logger *slog.Logger) *UserHandler {
-	userHandler := UserHandler{userRepo: repo.UserRepository, logger: logger}
+func RegisterAuthHandlers(e *echo.Echo, repo *repository.Repository, logger *slog.Logger) *UserHandler {
+	authHandler := UserHandler{userRepo: repo.UserRepository, logger: logger}
 
-	e.POST("/login", userHandler.LoginHandler)
-	e.POST("/register", userHandler.RegisterHandler)
+	e.POST("/login", authHandler.LoginHandler)
+	e.POST("/register", authHandler.RegisterHandler)
 
-	return &userHandler
+	return &authHandler
 }
