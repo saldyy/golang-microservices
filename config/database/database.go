@@ -25,7 +25,7 @@ func InitMongoClient() *DatabaseInstance {
 		log.Fatal("Cannot connect to Mongodb\n")
 		panic(err)
 	}
-	fmt.Printf("Connected to MongoDB\n")
+  log.Default().Printf("Connected to MongoDB\n")  
 	return &DatabaseInstance{DB: client.Database("test")}
 }
 
