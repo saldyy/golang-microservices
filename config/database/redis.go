@@ -2,7 +2,7 @@ package database
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"os"
 	"strconv"
 	"time"
@@ -14,6 +14,7 @@ var RedisInstance *RedisClientInstance
 
 type RedisClientInstance struct {
 	Client *redis.Client
+  logger *slog.Logger
 }
 
 type RedisConfigOptions struct {
@@ -50,7 +51,7 @@ func NewRedisConfigOptions() RedisConfigOptions {
 	return conf
 }
 
-func NewRedisClientInstance() *RedisClientInstance {
+func NewRedisClientInstance(logger * slog.Logger) *RedisClientInstance {
 	redisAddr := os.Getenv("REDIS_ADDRESS")
 	redisPass := os.Getenv("REDIS_PASSWORD")
 
@@ -62,8 +63,8 @@ func NewRedisClientInstance() *RedisClientInstance {
 	config := NewRedisConfigOptions().WithAddr(redisAddr).WithPassword(redisPass).WithDB(redisDB).GetConfig()
 	rdb := redis.NewClient(&config)
 
-	log.Default().Printf("Connected to Redis\n")
-	return &RedisClientInstance{Client: rdb}
+  logger.Info("Connected to Redis")
+	return &RedisClientInstance{Client: rdb, logger: logger}
 }
 
 func (rci *RedisClientInstance) RedisHealth() map[string]string {
@@ -71,10 +72,13 @@ func (rci *RedisClientInstance) RedisHealth() map[string]string {
 	defer cancel()
 
 	pong, err := rci.Client.Ping(ctx).Result()
-	log.Default().Printf("Redis ping: %v", pong)
+  rci.logger.Info("Redis ping", pong)
 
 	if err != nil {
-		log.Default().Fatal("Redis is down\n", err)
+    rci.logger.Error("Error connecting to Redis", err)
+		return map[string]string{
+			"message": "not_ok",
+		}
 	}
 
 	return map[string]string{

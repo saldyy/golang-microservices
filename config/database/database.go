@@ -2,8 +2,7 @@ package database
 
 import (
 	"context"
-	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"time"
 
@@ -15,18 +14,19 @@ var Instance *DatabaseInstance
 
 type DatabaseInstance struct {
 	DB *mongo.Database
+  logger *slog.Logger
 }
 
-func InitMongoClient() *DatabaseInstance {
+func InitMongoClient(logger *slog.Logger) *DatabaseInstance {
 	connectionUri := os.Getenv("MONGODB_URI")
 	client, err := mongo.Connect(context.Background(), options.Client().ApplyURI(connectionUri))
 
 	if err != nil {
-		log.Fatal("Cannot connect to Mongodb\n")
+    logger.Error("Error connecting to MongoDB", err)
 		panic(err)
 	}
-  log.Default().Printf("Connected to MongoDB\n")  
-	return &DatabaseInstance{DB: client.Database("test")}
+  logger.Info("Connected to MongoDB")
+	return &DatabaseInstance{DB: client.Database("test"), logger: logger}
 }
 
 func (di *DatabaseInstance) Health() map[string]string {
@@ -35,7 +35,10 @@ func (di *DatabaseInstance) Health() map[string]string {
 
 	err := di.DB.Client().Ping(ctx, nil)
 	if err != nil {
-		log.Fatalf(fmt.Sprintf("db down: %v", err))
+    di.logger.Error("Error connecting to MongoDB", err)
+		return map[string]string{
+			"message": "not_ok",
+		}
 	}
 
 	return map[string]string{

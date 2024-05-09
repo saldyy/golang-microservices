@@ -42,8 +42,8 @@ func (s *Server) Run(listen string) error {
 
 	s.logger.Info("Configuring HTTP server")
 
-	database.Instance = database.InitMongoClient()
-	database.RedisInstance = database.NewRedisClientInstance()
+	database.Instance = database.InitMongoClient(s.logger)
+	database.RedisInstance = database.NewRedisClientInstance(s.logger)
 	repos := repository.Init(database.Instance.DB, database.RedisInstance.Client)
 
 
