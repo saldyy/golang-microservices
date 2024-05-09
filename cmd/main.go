@@ -27,11 +27,12 @@ type Server struct {
 
 func main() {
 	err := godotenv.Load(filepath.Join(".", ".env"))
+	slogger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	if err != nil {
-		log.Fatal("Error loading .env file")
+    slogger.Error("Error loading .env file", err)
+    panic(err)
 	}
 
-	slogger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	server := &Server{logger: slogger}
 	server.Run(":8080")
 }
