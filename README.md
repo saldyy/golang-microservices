@@ -3,5 +3,3 @@
 ## TODO
 
 - [ ] Adding auto rotate JWT secret mechanism
-- [ ] Add logout
-- [ ] Adding blacklist with Redis
