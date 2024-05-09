@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -16,8 +17,9 @@ import (
 )
 
 type AuthHandler struct {
-	userRepo *repository.UserRepository
-	logger   *slog.Logger
+	userRepo         *repository.UserRepository
+	jwtBlacklistRepo *repository.JwtBlackListRepository
+	logger           *slog.Logger
 }
 
 type LoginCredential struct {
@@ -25,7 +27,7 @@ type LoginCredential struct {
 	Password string `json:"password"`
 }
 
-func (u *UserHandler) LoginHandler(c echo.Context) error {
+func (u *AuthHandler) LoginHandler(c echo.Context) error {
 	credential := new(LoginCredential)
 
 	if err := c.Bind(credential); err != nil {
@@ -54,10 +56,9 @@ func (u *UserHandler) LoginHandler(c echo.Context) error {
 		Issuer:    "auth-service",
 		IssuedAt:  jwt.NewNumericDate(time.Now()),
 		ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
-    
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS512, jwtClaims)
-  token.Header["kid"] = os.Getenv("JWT_KID")
+	token.Header["kid"] = os.Getenv("JWT_KID")
 
 	t, err := token.SignedString([]byte(os.Getenv("JWT_SECRET")))
 	if err != nil {
@@ -68,7 +69,7 @@ func (u *UserHandler) LoginHandler(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]string{"access_token": t})
 }
 
-func (u *UserHandler) RegisterHandler(c echo.Context) error {
+func (u *AuthHandler) RegisterHandler(c echo.Context) error {
 	credential := new(LoginCredential)
 
 	if err := c.Bind(credential); err != nil {
@@ -100,11 +101,29 @@ func (u *UserHandler) RegisterHandler(c echo.Context) error {
 	return c.String(http.StatusOK, "user.Username")
 }
 
-func RegisterAuthHandlers(e *echo.Echo, repo *repository.Repository, logger *slog.Logger) *UserHandler {
-	authHandler := UserHandler{userRepo: repo.UserRepository, logger: logger}
+func (u *AuthHandler) LogoutHandler(c echo.Context) error {
+	auth := c.Request().Header.Get("Authorization")
+	parts := strings.Split(auth, " ")
+	jwtToken := parts[1]
+
+	if jwtToken == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"message": "Invalid token"})
+	}
+
+	err := u.jwtBlacklistRepo.Add(jwtToken)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"message": "Internal server error"})
+	}
+
+	return c.NoContent(http.StatusOK)
+}
+
+func RegisterAuthHandlers(e *echo.Echo, repo *repository.Repository, logger *slog.Logger) *AuthHandler {
+	authHandler := AuthHandler{userRepo: repo.UserRepository, jwtBlacklistRepo: repo.JwtBlackListRepository, logger: logger}
 
 	e.POST("/login", authHandler.LoginHandler)
 	e.POST("/register", authHandler.RegisterHandler)
+	e.POST("/logout", authHandler.LogoutHandler)
 
 	return &authHandler
 }

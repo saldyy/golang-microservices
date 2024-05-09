@@ -1,15 +1,15 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/joho/godotenv"
-	"github.com/labstack/echo-jwt/v4"
+	echojwt "github.com/labstack/echo-jwt/v4"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/saldyy/golang-microservices/config/database"
@@ -31,25 +31,47 @@ func main() {
 		log.Fatal("Error loading .env file")
 	}
 
-	slogger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	slogger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	server := &Server{logger: slogger}
 	server.Run(":8080")
 }
 
 func (s *Server) Run(listen string) error {
+	keyId := os.Getenv("JWT_KID")
+	jwtSecret := os.Getenv("JWT_SECRET")
+
 	s.logger.Info("Configuring HTTP server")
 
 	database.Instance = database.InitMongoClient()
 	database.RedisInstance = database.NewRedisClientInstance()
-	repos := repository.Init(database.Instance.DB)
+	repos := repository.Init(database.Instance.DB, database.RedisInstance.Client)
+
 
 	e := echo.New()
 	e.HideBanner = true
 	e.Use(slogecho.New(s.logger))
 	e.Use(middleware.Recover())
 
-	keyId := os.Getenv("JWT_KID")
-	jwtSecret := os.Getenv("JWT_SECRET")
+  // Check token in blacklist
+	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			if c.Path() == "/login" || c.Path() == "/register" || c.Path() == "/health" {
+				return next(c)
+			}
+			auth := c.Request().Header.Get("Authorization")
+			parts := strings.Split(auth, " ")
+			jwtToken := parts[1]
+			blacklistToken, err := repos.JwtBlackListRepository.Get(jwtToken)
+
+			if err != nil {
+				s.logger.Error("Error getting token from blacklist", err)
+			}
+			if blacklistToken == "1" {
+				return c.JSON(401, map[string]string{"message": "Unauthorized"})
+			}
+			return next(c)
+		}
+	})
 
 	e.Use(echojwt.WithConfig(echojwt.Config{
 		ContextKey:  "user",
@@ -61,7 +83,7 @@ func (s *Server) Run(listen string) error {
 			return false
 		},
 		ErrorHandler: func(c echo.Context, er error) error {
-			fmt.Println(er)
+      s.logger.Error("Error validating token", er)
 			return c.JSON(401, map[string]string{"message": "Unauthorized"})
 		},
 		TokenLookup:   "header:Authorization:Bearer ",
