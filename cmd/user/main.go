@@ -1,9 +1,13 @@
 package main
 
 import (
+	"context"
 	"log/slog"
+	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/labstack/echo/v4"
@@ -26,8 +30,25 @@ func main() {
 		panic(err)
 	}
 
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+
+	defer stop()
+
 	server := &Server{logger: slogger}
-	server.Run(":8080")
+
+	go func() {
+		if err := server.Run(":8080"); err != nil && err != http.ErrServerClosed {
+			server.echo.Logger.Fatal("shutting down the server")
+		}
+	}()
+
+	<-ctx.Done()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := server.echo.Shutdown(ctx); err != nil {
+		server.logger.Error("Shutting down server")
+	}
 }
 
 func (s *Server) Run(listen string) error {
