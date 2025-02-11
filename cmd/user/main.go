@@ -12,6 +12,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/saldyy/golang-microservices/internal/health"
 	slogecho "github.com/samber/slog-echo"
 )
 
@@ -58,6 +59,8 @@ func (s *Server) Run(listen string) error {
 	s.echo.HideBanner = true
 	s.echo.Use(slogecho.New(s.logger))
 	s.echo.Use(middleware.Recover())
+
+  s.echo.GET("health", health.CheckHandler)
 
 	return s.echo.Start(":8080")
 }
