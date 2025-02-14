@@ -12,15 +12,15 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/saldyy/golang-microservices/internal/database"
 	"github.com/saldyy/golang-microservices/internal/health"
 	slogecho "github.com/samber/slog-echo"
 )
 
-const ()
-
 type Server struct {
 	echo   *echo.Echo
 	logger *slog.Logger
+	db     database.Db
 }
 
 func main() {
@@ -35,7 +35,8 @@ func main() {
 
 	defer stop()
 
-	server := &Server{logger: slogger}
+	db := database.New(os.Getenv("PG_CONNECTION_STRING"))
+	server := &Server{logger: slogger, db: *db}
 
 	go func() {
 		if err := server.Run(":8080"); err != nil && err != http.ErrServerClosed {
@@ -60,7 +61,14 @@ func (s *Server) Run(listen string) error {
 	s.echo.Use(slogecho.New(s.logger))
 	s.echo.Use(middleware.Recover())
 
-  s.echo.GET("health", health.CheckHandler)
+  s.RegisterRoutes();
 
 	return s.echo.Start(":8080")
+}
+
+func (s *Server) RegisterRoutes() {
+
+  healthHandler := health.New(&s.db);
+
+	s.echo.GET("health", healthHandler.CheckHandler)
 }
