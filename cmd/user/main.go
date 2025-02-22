@@ -6,10 +6,10 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"path/filepath"
+	//	"path/filepath"
 	"time"
 
-	"github.com/joho/godotenv"
+	//	"github.com/joho/godotenv"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/saldyy/golang-microservices/internal/database"
@@ -24,12 +24,12 @@ type Server struct {
 }
 
 func main() {
-	err := godotenv.Load(filepath.Join(".", ".env"))
+	// err := godotenv.Load(filepath.Join(".", ".env"))
 	slogger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
-	if err != nil {
-		slogger.Error("Error loading .env file", err)
-		panic(err)
-	}
+	// if err != nil {
+	// 	slogger.Error("Error loading .env file", err)
+	// 	panic(err)
+	// }
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 
@@ -61,14 +61,14 @@ func (s *Server) Run(listen string) error {
 	s.echo.Use(slogecho.New(s.logger))
 	s.echo.Use(middleware.Recover())
 
-  s.RegisterRoutes();
+	s.RegisterRoutes()
 
 	return s.echo.Start(":8080")
 }
 
 func (s *Server) RegisterRoutes() {
 
-  healthHandler := health.New(&s.db);
+	healthHandler := health.New(&s.db)
 
 	s.echo.GET("health", healthHandler.CheckHandler)
 }

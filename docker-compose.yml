@@ -1,21 +1,25 @@
+version: '3.8'
+
+x-common-variables: &common-variables
+  ENV: local
+
 services:
-  app:
-    build: .
+  user-svc:
+    build:
+      context: ./
+      dockerfile: ./cmd/user/Dockerfile
     ports:
-      - "8080:8080"
-    depends_on:
-      - mongodb
-      - redis
+      - '8080:8080'
+    environment: *common-variables
     networks:
       - backend
-  mongodb:
+  postgres:
     attach: false
-    image: mongo:7.0
+    image: postgres:16.8-alpine
     ports:
-      - "27017:27017"
+      - "5432:5432"
     environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: secret
+      POSTGRES_PASSWORD: secret
     networks:
       - backend
   redis:
