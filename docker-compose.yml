@@ -4,12 +4,17 @@ x-common-variables: &common-variables
   ENV: local
 
 services:
+  gateway:
+    build:
+      context: ./nginx
+    ports:
+      - '80:80'
+    networks:
+      - backend
   user-svc:
     build:
       context: ./
       dockerfile: ./cmd/user/Dockerfile
-    ports:
-      - '8080:8080'
     environment: *common-variables
     networks:
       - backend
